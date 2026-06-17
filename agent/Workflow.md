@@ -1,0 +1,104 @@
+# Workflow — pythonchat-youtubelive
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     main()                               │
+│  1. แสดง "วางลิงก์ YouTube Live หรือ video id"             │
+│  2. user input URL / id                                  │
+└──────────┬───────────────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────┐
+│               get_video_id(text)                         │
+│  1. มี "v=" → ตัดเอา value หลัง v= (จนถึง &)              │
+│  2. มี "youtu.be/" → ตัดเอาหลัง youtu.be/                │
+│  3. อื่นๆ → คืน text ตรงๆ (ถือว่าเป็น video id)           │
+└──────────┬───────────────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────┐
+│              get_youtubechat(video_id)                   │
+│  1. chat = pytchat.create(video_id=video_id)             │
+│  2. while chat.is_alive():                               │
+│       try:                                               │
+│         items = chat.get().sync_items()                  │
+│       except httpx.ReadTimeout:                          │
+│         รอ 3 วิ แล้ว continue                             │
+│                                                          │
+│       for c in items:                                    │
+│         clean = sanitize_message(c.message)              │
+│         ถ้า clean ไม่ว่าง → print(f"{name}: {clean}")     │
+│                                                          │
+│  3. KeyboardInterrupt → print("หยุดแล้ว")                │
+│  4. Exception อื่น → print error + คำแนะนำ               │
+└──────────┬───────────────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────┐
+│              sanitize_message(message)                   │
+│                                                          │
+│  text = message.strip()                                  │
+│  ถ้า text ว่าง → return ""                                │
+│                                                          │
+│  aliases = emoji aliases ทั้งหมดใน text                   │
+│  ถ้าไม่มี aliases → return text                           │
+│                                                          │
+│  ┌─ กรณีที่ 1: text มีอักขระอื่นปนกับ emoji ─┐            │
+│  │ joined_aliases != text                      │            │
+│  │ → ลบ trailing repeated aliases             │            │
+│  │ → return text ที่ cleaned แล้ว              │            │
+│  └─────────────────────────────────────────────┘            │
+│                                                          │
+│  ┌─ กรณีที่ 2: text มีแต่ emoji ล้วน ────────────────────┐  │
+│  │ joined_aliases == text                         │            │
+│  │ → ตรวจชนิด: unique == 1 และ count >= 2         │            │
+│  │   → จริง: return "" (spam)                     │            │
+│  │   → เท็จ: return text (emoji หลากหลาย)         │            │
+│  └─────────────────────────────────────────────┘            │
+└──────────────────────────────────────────────────────────┘
+```
+
+## Flow สรุป
+
+```
+User Input → Parse Video ID → pytchat.connect()
+                                    │
+                           while chat.is_alive()
+                                    │
+                           ┌────────┴────────┐
+                           │  ReadTimeout?   │
+                           └────────┬────────┘
+                               Yes  │  No
+                               รอ 3 วิ │
+                               ┌─────┘
+                               ▼
+                        fetch sync_items()
+                               │
+                               ▼
+                        for each message
+                               │
+                               ▼
+                        sanitize_message()
+                               │
+                      ┌────────┴────────┐
+                      │  ผ่านหรือโดนfilter?│
+                      └────────┬────────┘
+                       filter │  ผ่าน
+                              │
+                              ▼
+                        print output
+```
+
+## ประเภท output ปัจจุบัน
+```
+ผู้ส่ง: ข้อความ
+เช่น: John: สวัสดีครับ
+```
+
+## จุดที่สามารถต่อยอด
+| จุดใน Flow | สิ่งที่ทำเพิ่มได้ |
+|------------|-----------------|
+| หลัง sanitize_message | บันทึก raw ลงไฟล์ |
+| ก่อน print | แปลภาษา, สรุปด้วย AI |
+| ตอนรับ input | รองรับ playlist, channel |
+| ใน loop | แยกห้อง, statistics |
