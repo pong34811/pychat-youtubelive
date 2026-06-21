@@ -1,7 +1,7 @@
 import re
 
 
-EMOJI_ALIAS_PATTERN = re.compile(r":[a-z0-9-]+:")
+EMOJI_ALIAS_PATTERN = re.compile(r":[a-z0-9_-]+:")
 
 
 def sanitize_message(message: str) -> str:

@@ -31,6 +31,7 @@ MIN_TEXT_LENGTH = 2
 class TTSHandler:
     def __init__(self, voice: str = "th-TH-PremwadeeNeural") -> None:
         self.voice = voice
+        self.volume: float = 0.5
         self.queue: queue.Queue = queue.Queue()
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
@@ -38,6 +39,9 @@ class TTSHandler:
             pygame.mixer.init()
         except Exception:
             pass
+
+    def set_volume(self, volume: float) -> None:
+        self.volume = max(0.0, min(1.0, volume))
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -75,6 +79,7 @@ class TTSHandler:
                     tmp_path = f.name
                 asyncio.run(tts.save(tmp_path))
                 pygame.mixer.music.load(tmp_path)
+                pygame.mixer.music.set_volume(self.volume)
                 pygame.mixer.music.play()
                 while pygame.mixer.music.get_busy() and not self._stop_event.is_set():
                     threading.Event().wait(0.1)

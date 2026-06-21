@@ -62,6 +62,21 @@ class ChatGUI(ctk.CTk):
         )
         self._tts_check.pack(side="left", padx=5)
 
+        self._volume_var = ctk.DoubleVar(value=50)
+        self._volume_slider = ctk.CTkSlider(
+            control_frame,
+            from_=0,
+            to=100,
+            variable=self._volume_var,
+            width=100,
+            command=self._on_volume_change,
+        )
+        self._volume_slider.set(50)
+        self._volume_slider.pack(side="left", padx=5)
+
+        self._volume_label = ctk.CTkLabel(control_frame, text="🔊 50%")
+        self._volume_label.pack(side="left", padx=(0, 5))
+
         self._chat_box = ctk.CTkTextbox(self, wrap="word", state="disabled")
         self._chat_box.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -146,6 +161,11 @@ class ChatGUI(ctk.CTk):
 
     def _set_status(self, text: str) -> None:
         self._status_label.configure(text=text)
+
+    def _on_volume_change(self, value: float) -> None:
+        volume = int(value)
+        self._volume_label.configure(text=f"🔊 {volume}%")
+        self._tts.set_volume(volume / 100)
 
     def _on_close(self) -> None:
         self._stop_event.set()
