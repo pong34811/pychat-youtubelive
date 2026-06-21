@@ -4,16 +4,21 @@ import httpx
 import pytchat
 
 from fix_message import sanitize_message
+from tts_handler import TTSHandler
 
-def get_video_id(text):
+
+def get_video_id(text: str) -> str:
     if "v=" in text:
         return text.split("v=")[-1].split("&")[0]
     if "youtu.be/" in text:
         return text.split("youtu.be/")[-1]
-    return text  # กรณีใส่เป็น video id ตรงๆ
+    return text
 
-def get_youtubechat(video_id):
+def get_youtubechat(video_id: str) -> None:
     chat = pytchat.create(video_id=video_id)
+    tts = TTSHandler()
+    tts.start()
+
     while chat.is_alive():
         try:
             items = chat.get().sync_items()
@@ -27,9 +32,11 @@ def get_youtubechat(video_id):
             if not clean_message:
                 continue
             print(f"{c.author.name}: {clean_message}")
+            tts.speak(c.author.name, clean_message)
 
+    tts.stop()
 
-def main():
+def main() -> None:
     print("วางลิงก์ YouTube Live หรือ video id")
     url = input("> ")
 

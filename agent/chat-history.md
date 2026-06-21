@@ -19,3 +19,17 @@
 - อัปเดต `chat-history.md` ตามที่ user แจ้งเตือน
 - สร้าง `agent/Workflow.md` — ASCII Diagram workflow ของโปรแกรม
 - สรุป: ทุกครั้งที่ทำงานเสร็จ ต้องกลับมาอัปเดต chat-history.md ด้วย
+
+---
+
+## 21/6/2569 — เพิ่มระบบ TTS (edge-tts)
+
+- brainstorm ฟีเจอร์ TTS, เลือกใช้ **edge-tts** เสียง `th-TH-PremwadeeNeural`
+- อัปเดต `agent/Workflow.md` — เพิ่ม TTS step ใน diagram
+- สร้าง `agent/Design.md` — design doc
+- สร้าง `tts_handler.py` — TTSHandler class: background thread + queue, filter emoji/ข้อความสั้น, truncate 200 chars
+- แก้ `main.py` — import TTSHandler, เรียก `tts.speak()` หลัง print
+- สร้าง `tests/test_tts_handler.py` — 6 tests ครอบคลุม queue, filter, stop
+- อัปเดต `requirements.txt` — เพิ่ม edge-tts, pygame, pytest
+- แก้บัค voice name: `Premmawadee` → `Premwadee`
+- แก้บัค file lock: เพิ่ม `stop()` + `unload()` ก่อนลบ temp mp3
