@@ -6,3 +6,7 @@ venv/
 *.mp3
 requirements_temp.txt
 test_*.py
+
+build/
+dist/
+*.spec
