@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+*.mp3
+requirements_temp.txt
+test_*.py
