@@ -39,24 +39,11 @@
 ┌──────────────────────────────────────────────────────────┐
 │              sanitize_message(message)                   │
 │                                                          │
-│  text = message.strip()                                  │
+│  text = ลบ emoji aliases ทั้งหมด (:xxx:)                │
+│         แล้ว strip()                                     │
+│                                                          │
 │  ถ้า text ว่าง → return ""                                │
-│                                                          │
-│  aliases = emoji aliases ทั้งหมดใน text                   │
-│  ถ้าไม่มี aliases → return text                           │
-│                                                          │
-│  ┌─ กรณีที่ 1: text มีอักขระอื่นปนกับ emoji ─┐            │
-│  │ joined_aliases != text                      │            │
-│  │ → ลบ trailing repeated aliases             │            │
-│  │ → return text ที่ cleaned แล้ว              │            │
-│  └─────────────────────────────────────────────┘            │
-│                                                          │
-│  ┌─ กรณีที่ 2: text มีแต่ emoji ล้วน ────────────────────┐  │
-│  │ joined_aliases == text                         │            │
-│  │ → ตรวจชนิด: unique == 1 และ count >= 2         │            │
-│  │   → จริง: return "" (spam)                     │            │
-│  │   → เท็จ: return text (emoji หลากหลาย)         │            │
-│  └─────────────────────────────────────────────┘            │
+│  ถ้า text มีข้อความ → return text                        │
 └──────────────────────────────────────────────────────────┘
 ```
 
