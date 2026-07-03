@@ -22,7 +22,7 @@ class ChatGUI(ctk.CTk):
         self.minsize(500, 400)
 
         self._message_queue: queue.Queue = queue.Queue()
-        self._tts = TTSHandler()
+        self._tts = TTSHandler(message_queue=self._message_queue)
         self._tts.start()
 
         self._workers: list = []
@@ -55,6 +55,7 @@ class ChatGUI(ctk.CTk):
         self._tt_entry = ctk.CTkEntry(
             tt_frame, placeholder_text="@username"
         )
+        self._tt_entry.insert(0, "@katy404_vtuberth")
         self._tt_entry.pack(side="left", fill="x", expand=True, padx=5)
         self._tt_btn = ctk.CTkButton(
             tt_frame, text="Start", command=lambda: self._start_platform("TT"),
@@ -70,6 +71,7 @@ class ChatGUI(ctk.CTk):
         self._tw_entry = ctk.CTkEntry(
             tw_frame, placeholder_text="#channel"
         )
+        self._tw_entry.insert(0, "kaynavtuberth")
         self._tw_entry.pack(side="left", fill="x", expand=True, padx=5)
         self._tw_btn = ctk.CTkButton(
             tw_frame, text="Start", command=lambda: self._start_platform("TW"),
@@ -125,6 +127,10 @@ class ChatGUI(ctk.CTk):
                 return
             video_id = get_video_id(url)
             worker = YouTubeWorker(video_id, self._message_queue)
+            err = worker.create_chat()
+            if err:
+                self._set_status(f"❌ YouTube: {err}")
+                return
             self._yt_btn.configure(state="disabled")
         elif platform == "TT":
             username = self._tt_entry.get().strip()
@@ -163,29 +169,34 @@ class ChatGUI(ctk.CTk):
                 if name == "[ระบบ]":
                     self._platform_status[platform] = text
                     self._update_status()
+                elif platform == "TTS":
+                    self._display_message(platform, name, text)
                 else:
                     self._display_message(platform, name, text)
                     if self._tts_var.get():
-                        self._tts.speak(f"[{platform}] {name}", text)
+                        self._tts.speak(name, text)
         except queue.Empty:
             pass
         self.after(100, self._poll_messages)
 
     def _display_message(self, platform: str, name: str, text: str) -> None:
-        color_map = {"YT": "#FF0000", "TT": "#00FF00", "TW": "#9147FF"}
-        color = color_map.get(platform, "#FFFFFF")
+        icon_map = {"YT": "▶️", "TT": "🎵", "TW": "🎮"}
+        icon = icon_map.get(platform, platform)
 
         self._chat_box.configure(state="normal")
-        self._chat_box.insert("end", f"[{platform}] ", "platform_tag")
-        self._chat_box.insert("end", f"{name}: {text}\n")
+        self._chat_box.insert("end", f"{icon} {name}: {text}\n")
         self._chat_box.see("end")
         self._chat_box.configure(state="disabled")
 
     def _update_status(self) -> None:
+        icon_map = {"YT": "▶️", "TT": "🎵", "TW": "🎮"}
         parts = []
         for p, s in self._platform_status.items():
-            parts.append(f"[{p}] {s}")
-        self._status_label.configure(text=" | ".join(parts) if parts else "✅ พร้อมทำงาน")
+            icon = icon_map.get(p, p)
+            parts.append(f"{icon} {s}")
+        self._status_label.configure(
+            text=" | ".join(parts) if parts else "✅ พร้อมทำงาน"
+        )
 
     def _set_status(self, text: str) -> None:
         self._status_label.configure(text=text)
