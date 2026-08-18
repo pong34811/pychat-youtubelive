@@ -1,11 +1,12 @@
 import time
+import logging
 
 import httpx
 import pytchat
 
 from fix_message import sanitize_message
 from tts_handler import TTSHandler
-
+from config.logging_config import setup_logging
 
 def get_video_id(text: str) -> str:
     if "v=" in text:
@@ -23,7 +24,7 @@ def get_youtubechat(video_id: str) -> None:
         try:
             items = chat.get().sync_items()
         except httpx.ReadTimeout:
-            print("เชื่อมต่อช้า กำลังลองใหม่ใน 3 วินาที...")
+            logging.warning("เชื่อมต่อช้า กำลังลองใหม่ใน 3 วินาที…")
             time.sleep(3)
             continue
 
@@ -31,25 +32,26 @@ def get_youtubechat(video_id: str) -> None:
             clean_message = sanitize_message(c.message)
             if not clean_message:
                 continue
-            print(f"{c.author.name}: {clean_message}")
+            logging.info(f"{c.author.name}: {clean_message}")
             tts.speak(c.author.name, clean_message)
 
     tts.stop()
 
 def main() -> None:
-    print("วางลิงก์ YouTube Live หรือ video id")
+    setup_logging()
+    logging.info("วางลิงก์ YouTube Live หรือ video id")
     url = input("> ")
 
     video_id = get_video_id(url)
-    print("กำลังอ่านแชต...\n")
+    logging.info("กำลังอ่านแชต…")
 
     try:
         get_youtubechat(video_id)
     except KeyboardInterrupt:
         print("หยุดแล้ว")
     except Exception as error:
-        print(f"เกิดข้อผิดพลาด: {error}")
-        print("ตรวจสอบว่าลิงก์เป็นไลฟ์จริง, แชตเปิดอยู่, และอินเทอร์เน็ตเชื่อมต่อปกติ")
+        logging.exception(f"เกิดข้อผิดพลาด: {error}")
+        logging.error("ตรวจสอบว่าลิงก์เป็นไลฟ์จริง, แชตเปิดอยู่, และอินเทอร์เน็ตเชื่อมต่อปกติ")
 
 if __name__ == "__main__":
     main()

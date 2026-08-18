@@ -4,7 +4,7 @@ from typing import Optional
 
 import customtkinter as ctk
 
-from chat_workers import YouTubeWorker, TikTokWorker, TwitchWorker
+from chat_workers import get_worker
 from main import get_video_id
 from tts_handler import TTSHandler
 
@@ -25,11 +25,13 @@ class ChatGUI(ctk.CTk):
         self._tts = TTSHandler(message_queue=self._message_queue)
         self._tts.start()
 
-        self._workers: list = []
+        # Track workers per platform (at most one per platform)
+        self._workers: dict[str, object] = {}
         self._platform_status: dict[str, str] = {}
 
         self._build_ui()
         self.after(100, self._poll_messages)
+        self.after(5000, self._health_check)
 
     def _build_ui(self) -> None:
         # --- YouTube ---
@@ -42,7 +44,7 @@ class ChatGUI(ctk.CTk):
         )
         self._yt_entry.pack(side="left", fill="x", expand=True, padx=5)
         self._yt_btn = ctk.CTkButton(
-            yt_frame, text="Start", command=lambda: self._start_platform("YT"),
+            yt_frame, text="Start", command=lambda: self._toggle_platform("YT"),
             width=60
         )
         self._yt_btn.pack(side="right")
@@ -58,7 +60,7 @@ class ChatGUI(ctk.CTk):
         self._tt_entry.insert(0, "@katy404_vtuberth")
         self._tt_entry.pack(side="left", fill="x", expand=True, padx=5)
         self._tt_btn = ctk.CTkButton(
-            tt_frame, text="Start", command=lambda: self._start_platform("TT"),
+            tt_frame, text="Start", command=lambda: self._toggle_platform("TT"),
             width=60
         )
         self._tt_btn.pack(side="right")
@@ -74,7 +76,7 @@ class ChatGUI(ctk.CTk):
         self._tw_entry.insert(0, "kaynavtuberth")
         self._tw_entry.pack(side="left", fill="x", expand=True, padx=5)
         self._tw_btn = ctk.CTkButton(
-            tw_frame, text="Start", command=lambda: self._start_platform("TW"),
+            tw_frame, text="Start", command=lambda: self._toggle_platform("TW"),
             width=60
         )
         self._tw_btn.pack(side="right")
@@ -119,48 +121,97 @@ class ChatGUI(ctk.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    # --- helpers to map platform to button/entry ---
+
+    def _get_btn(self, platform: str) -> ctk.CTkButton:
+        return {"YT": self._yt_btn, "TT": self._tt_btn, "TW": self._tw_btn}[platform]
+
+    def _get_entry(self, platform: str) -> ctk.CTkEntry:
+        return {"YT": self._yt_entry, "TT": self._tt_entry, "TW": self._tw_entry}[platform]
+
+    # --- toggle Start / Stop per platform ---
+
+    def _toggle_platform(self, platform: str) -> None:
+        if platform in self._workers:
+            self._stop_platform(platform)
+        else:
+            self._start_platform(platform)
+
     def _start_platform(self, platform: str) -> None:
+        entry = self._get_entry(platform)
+        identifier = entry.get().strip()
+
         if platform == "YT":
-            url = self._yt_entry.get().strip()
-            if not url:
+            if not identifier:
                 self._set_status("⚠️ กรุณาใส่ URL YouTube")
                 return
-            video_id = get_video_id(url)
-            worker = YouTubeWorker(video_id, self._message_queue)
+            identifier = get_video_id(identifier)
+        elif platform == "TT":
+            if not identifier:
+                self._set_status("⚠️ กรุณาใส่ TikTok username")
+                return
+        elif platform == "TW":
+            if not identifier:
+                self._set_status("⚠️ กรุณาใส่ Twitch channel")
+                return
+        else:
+            return
+
+        try:
+            worker = get_worker(platform, identifier, self._message_queue)
+        except Exception as e:
+            self._set_status(f"❌ {platform}: {e}")
+            return
+
+        # Platform-specific post-creation steps
+        if platform == "YT":
             err = worker.create_chat()
             if err:
                 self._set_status(f"❌ YouTube: {err}")
                 return
-            self._yt_btn.configure(state="disabled")
-        elif platform == "TT":
-            username = self._tt_entry.get().strip()
-            if not username:
-                self._set_status("⚠️ กรุณาใส่ TikTok username")
-                return
-            worker = TikTokWorker(username, self._message_queue)
-            self._tt_btn.configure(state="disabled")
-        elif platform == "TW":
-            channel = self._tw_entry.get().strip()
-            if not channel:
-                self._set_status("⚠️ กรุณาใส่ Twitch channel")
-                return
-            worker = TwitchWorker(channel, self._message_queue)
-            self._tw_btn.configure(state="disabled")
-        else:
-            return
 
         worker.start()
-        self._workers.append(worker)
+        self._workers[platform] = worker
+
+        btn = self._get_btn(platform)
+        btn.configure(text="Stop", fg_color="#c0392b", hover_color="#922b21")
         self._set_status(f"⏳ {platform} กำลังเชื่อมต่อ...")
 
+    def _stop_platform(self, platform: str) -> None:
+        worker = self._workers.pop(platform, None)
+        if worker:
+            worker.stop()
+
+        btn = self._get_btn(platform)
+        btn.configure(text="Start", fg_color=("#2CC985", "#2FA572"), hover_color=("#0C955A", "#106A43"))
+
+        self._platform_status.pop(platform, None)
+        self._update_status()
+        self._set_status(f"⏹ {platform} หยุดแล้ว")
+
     def _stop_all(self) -> None:
-        for w in self._workers:
-            w.stop()
-        self._workers.clear()
-        self._yt_btn.configure(state="normal")
-        self._tt_btn.configure(state="normal")
-        self._tw_btn.configure(state="normal")
+        for platform in list(self._workers.keys()):
+            self._stop_platform(platform)
         self._set_status("⏹ หยุดทั้งหมดแล้ว")
+
+    # --- health check: detect dead worker threads ---
+
+    def _health_check(self) -> None:
+        dead_platforms = []
+        for platform, worker in list(self._workers.items()):
+            if not worker.is_alive:
+                dead_platforms.append(platform)
+
+        for platform in dead_platforms:
+            self._workers.pop(platform, None)
+            btn = self._get_btn(platform)
+            btn.configure(text="Start", fg_color=("#2CC985", "#2FA572"), hover_color=("#0C955A", "#106A43"))
+            self._platform_status[platform] = "📴 disconnected"
+
+        if dead_platforms:
+            self._update_status()
+
+        self.after(5000, self._health_check)
 
     def _poll_messages(self) -> None:
         try:

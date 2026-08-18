@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 import queue
 import threading
+import logging
 
+logger = logging.getLogger(__name__)
 
 class BaseWorker(ABC):
     def __init__(self, message_queue: queue.Queue) -> None:
@@ -19,6 +21,9 @@ class BaseWorker(ABC):
 
     def stop(self) -> None:
         self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5)
+            logger.debug("Worker thread joined")
 
     @property
     def is_alive(self) -> bool:

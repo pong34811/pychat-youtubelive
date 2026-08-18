@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pychat-youtubelive"
+version = "0.1.0"
+description = "Read YouTube Live chat and speak messages via Edge TTS"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Your Name", email = "you@example.com"}]
+keywords = ["youtube", "live", "chat", "tts", "edge-tts"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pytchat",
+    "edge-tts",
+    "pygame",
+    "httpx",
+]
+[project.optional-dependencies]
+pytest = ["pytest"]
+#dev = ["black", "flake8"]
+
+[project.scripts]
+pychat-youtubelive = "main:main"

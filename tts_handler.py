@@ -4,32 +4,24 @@ import queue
 import re
 import tempfile
 import threading
+import logging
 
 import edge_tts
 import pygame
 
+# Project imports
+from config.constants import EMOJI_REGEX, MIN_TTS_MESSAGE_LEN, MAX_TTS_MESSAGE_LEN, DEFAULT_TTS_VOICE
 
-EMOJI_PATTERN = re.compile(
-    "["
-    "\U0001F600-\U0001F64F"
-    "\U0001F300-\U0001F5FF"
-    "\U0001F680-\U0001F6FF"
-    "\U0001F1E0-\U0001F1FF"
-    "\U00002702-\U000027B0"
-    "\U000024C2-\U0001F251"
-    "\U0001F900-\U0001F9FF"
-    "\U0001FA00-\U0001FA6F"
-    "\U0001FA70-\U0001FAFF"
-    "\U00002600-\U000026FF"
-    "\U0000FE00-\U0000FE0F"
-    "]+"
-)
-MAX_TEXT_LENGTH = 200
-MIN_TEXT_LENGTH = 2
+logger = logging.getLogger(__name__)
+
+
+EMOJI_PATTERN = re.compile(EMOJI_REGEX)
+MAX_TEXT_LENGTH = MAX_TTS_MESSAGE_LEN
+MIN_TEXT_LENGTH = MIN_TTS_MESSAGE_LEN
 
 
 class TTSHandler:
-    def __init__(self, message_queue: queue.Queue | None = None, voice: str = "th-TH-PremwadeeNeural") -> None:
+    def __init__(self, message_queue: queue.Queue | None = None, voice: str = DEFAULT_TTS_VOICE) -> None:
         self.voice = voice
         self.volume: float = 0.5
         self.rate: str = "-15%"   # ความเร็วในการอ่าน (ค่าลบ = ช้าลง, ค่าบวก = เร็วขึ้น)
@@ -50,23 +42,35 @@ class TTSHandler:
         self._thread.start()
 
     def speak(self, name: str, message: str) -> None:
-        name = name.lstrip("@")  # นำ @ ออกจากชื่อผู้ใช้
+        # Remove leading @ from usernames
+        name = name.lstrip("@")
+        # Initial whitespace stripping
         text = message.strip()
         if not text:
-            self._debug(f"speak skipped: empty after strip")
+            logger.debug("speak skipped: empty after initial strip")
             return
-        text = EMOJI_PATTERN.sub("", text).strip()
+        # Remove colon‑style emoji placeholders
+        text = EMOJI_PATTERN.sub("", text)
+        # Remove any Unicode emoji characters (covers Supplementary Plane)
+        text = re.sub(r"[\U00010000-\U0010FFFF]+", "", text)
+        # Final strip to clean up spaces left by removals
+        text = text.strip()
+        if not text:
+            logger.debug("speak skipped: message became empty after emoji removal")
+            return
         if len(text) < MIN_TEXT_LENGTH:
-            self._debug(f"speak skipped: too short ({len(text)} chars)")
+            logger.debug(f"speak skipped: too short ({len(text)} chars)")
             return
         if len(text) > MAX_TEXT_LENGTH:
             text = text[:MAX_TEXT_LENGTH]
-        self._debug(f"speak queued: {name} กล่าวว่า {text[:50]}")
+        logger.debug(f"speak queued: {name} said {text[:50]}")
         self.queue.put((name, text))
 
     def _debug(self, msg: str) -> None:
         if self._msg_q:
             self._msg_q.put(("TTS", "[ระบบ]", f"⚙️ {msg}"))
+        else:
+            logger.debug(msg)
 
     def stop(self) -> None:
         self._stop_event.set()

@@ -1,6 +1,7 @@
 import queue
 import re
 import socket
+import time
 
 from fix_message import sanitize_message
 from .base_worker import BaseWorker
@@ -29,6 +30,37 @@ class TwitchWorker(BaseWorker):
             sock.connect((IRC_HOST, IRC_PORT))
             sock.send(f"PASS oauth:{token}\r\n".encode())
             sock.send(f"NICK {self.channel}\r\n".encode())
+
+            # Wait for 001 welcome before joining
+            sock.settimeout(5)
+            buf = ""
+            registered = False
+            deadline = time.time() + 10
+            while time.time() < deadline and not registered:
+                try:
+                    data = sock.recv(4096).decode(errors="ignore")
+                except socket.timeout:
+                    self.message_queue.put((PLATFORM, "[ระบบ]", "⚠️ Twitch: timeout waiting for registration"))
+                    sock.close()
+                    return
+                buf += data
+                for line in buf.split("\r\n"):
+                    if line.startswith("PING"):
+                        sock.send(line.replace("PING", "PONG").encode() + b"\r\n")
+                    elif " 001 " in line:
+                        registered = True
+                    elif "Login authentication failed" in line:
+                        self.message_queue.put((PLATFORM, "[ระบบ]", "❌ Twitch: token ไม่ถูกต้อง"))
+                        sock.close()
+                        return
+                # Keep the last segment in case it's an incomplete line
+                buf = buf.split("\r\n")[-1]
+
+            if not registered:
+                self.message_queue.put((PLATFORM, "[ระบบ]", "❌ Twitch: registration failed"))
+                sock.close()
+                return
+
             sock.send(f"JOIN #{self.channel}\r\n".encode())
             sock.settimeout(1)
         except Exception as e:
@@ -47,6 +79,8 @@ class TwitchWorker(BaseWorker):
                 break
 
             for line in data.split("\r\n"):
+                if not line:
+                    continue
                 if line.startswith("PING"):
                     sock.send(line.replace("PING", "PONG").encode() + b"\r\n")
                     continue
