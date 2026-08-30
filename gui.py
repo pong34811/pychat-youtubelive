@@ -28,6 +28,7 @@ class ChatGUI(ctk.CTk):
         # Track workers per platform (at most one per platform)
         self._workers: dict[str, object] = {}
         self._platform_status: dict[str, str] = {}
+        self._reconnect_counts: dict[str, int] = {}
 
         self._build_ui()
         self.after(100, self._poll_messages)
@@ -186,6 +187,7 @@ class ChatGUI(ctk.CTk):
         btn.configure(text="Start", fg_color=("#2CC985", "#2FA572"), hover_color=("#0C955A", "#106A43"))
 
         self._platform_status.pop(platform, None)
+        self._reconnect_counts.pop(platform, None)
         self._update_status()
         self._set_status(f"⏹ {platform} หยุดแล้ว")
 
@@ -219,6 +221,7 @@ class ChatGUI(ctk.CTk):
                 platform, name, text = self._message_queue.get_nowait()
                 if name == "[ระบบ]":
                     self._platform_status[platform] = text
+                    self._track_reconnect(platform, text)
                     self._update_status()
                 elif platform == "TTS":
                     self._display_message(platform, name, text)
@@ -229,6 +232,15 @@ class ChatGUI(ctk.CTk):
         except queue.Empty:
             pass
         self.after(100, self._poll_messages)
+
+    def _track_reconnect(self, platform: str, text: str) -> None:
+        """Track reconnect attempts from worker status messages."""
+        if text.startswith("🔄"):
+            # Reconnect attempt — increment counter
+            self._reconnect_counts[platform] = self._reconnect_counts.get(platform, 0) + 1
+        elif "reconnected" in text.lower() or "connected" in text.lower():
+            # Successful reconnect or fresh connect — reset counter
+            self._reconnect_counts[platform] = 0
 
     def _display_message(self, platform: str, name: str, text: str) -> None:
         icon_map = {"YT": "▶️", "TT": "🎵", "TW": "🎮"}
@@ -244,7 +256,11 @@ class ChatGUI(ctk.CTk):
         parts = []
         for p, s in self._platform_status.items():
             icon = icon_map.get(p, p)
-            parts.append(f"{icon} {s}")
+            count = self._reconnect_counts.get(p, 0)
+            if count > 0:
+                parts.append(f"{icon} {s}  🔄×{count}")
+            else:
+                parts.append(f"{icon} {s}")
         self._status_label.configure(
             text=" | ".join(parts) if parts else "✅ พร้อมทำงาน"
         )
