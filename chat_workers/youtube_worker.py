@@ -1,6 +1,5 @@
 import time
 import queue
-import queue as _queue
 import logging
 import threading
 from typing import Any
@@ -56,7 +55,7 @@ class YouTubeWorker(BaseWorker):
         t.start()
         try:
             return result_q.get(timeout=timeout)
-        except _queue.Empty:
+        except queue.Empty:
             logger.warning("chat.get() blocked for %.0fs — stream likely dead", timeout)
             return []
 
@@ -131,7 +130,7 @@ class YouTubeWorker(BaseWorker):
                     chat = pytchat.create(video_id=self.video_id)
                     self._chat = chat
                 except Exception:
-                    pass  # will loop back and retry
+                    continue  # re-enter inner loop to test new chat
 
         self.message_queue.put((PLATFORM, "[ระบบ]", "⏹ YouTube stopped"))
 
