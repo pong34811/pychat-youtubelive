@@ -1,5 +1,11 @@
 # Chat History Log
 
+## 14/10/2569 — แก้ Edge TTS ตอบ 403
+
+- อัปเกรด `edge-tts` จาก 7.2.8 เป็น 7.3.1 ซึ่งเพิ่มการรองรับ Sec-MS-GEC v2 ที่ Microsoft บังคับใช้ในเดือนตุลาคม 2026
+- ทดสอบแบบ command line ด้วยเสียง `th-TH-NiwatNeural` และข้อความภาษาไทย ได้ MP3 ขนาด 18,288 ไบต์ โดยไม่พบ 403
+- อัปเดต `requirements.txt` จากผล `pip freeze` ของ venv
+
 ## 16/6/2569 — สร้างโปรเจกต์และ agent files
 
 - ตรวจสอบโครงสร้างโปรเจกต์ `pythonchat-youtubelive` (main.py, fix_message.py, requirements.txt, mise.toml)
