@@ -12,7 +12,6 @@ from .base_worker import BaseWorker
 
 
 PLATFORM = "YT"
-MAX_RETRIES = 10
 INITIAL_BACKOFF = 3  # seconds
 MAX_BACKOFF = 60     # seconds
 GET_ITEMS_TIMEOUT = 60  # seconds — force reconnect when poll blocks this long
@@ -29,7 +28,7 @@ class YouTubeWorker(BaseWorker):
 
     def create_chat(self) -> str | None:
         try:
-            self._chat = pytchat.create(video_id=self.video_id)
+            self._chat = pytchat.create(video_id=self.video_id, interruptable=False)
             return None
         except Exception as e:
             return str(e)
@@ -109,16 +108,9 @@ class YouTubeWorker(BaseWorker):
                     return
 
                 retries += 1
-                if retries >= MAX_RETRIES:
-                    self.message_queue.put(
-                        (PLATFORM, "[ระบบ]", f"❌ YouTube error — หยุดทำงาน: {e}")
-                    )
-                    logger.exception("YouTube worker giving up after %d retries", MAX_RETRIES)
-                    return
-
                 backoff = min(INITIAL_BACKOFF * (2 ** (retries - 1)), MAX_BACKOFF)
                 self.message_queue.put(
-                    (PLATFORM, "[ระบบ]", f"⚠️ YouTube error: {e} — retry {retries}/{MAX_RETRIES} (รอ {backoff}s)")
+                    (PLATFORM, "[ระบบ]", f"⚠️ YouTube error: {e} — retry {retries} (รอ {backoff}s)")
                 )
                 logger.warning("YouTube worker error (attempt %d): %s", retries, e)
 
@@ -127,7 +119,7 @@ class YouTubeWorker(BaseWorker):
 
                 # Try to recreate chat after unexpected error
                 try:
-                    chat = pytchat.create(video_id=self.video_id)
+                    chat = pytchat.create(video_id=self.video_id, interruptable=False)
                     self._chat = chat
                 except Exception:
                     continue  # re-enter inner loop to test new chat
@@ -141,15 +133,9 @@ class YouTubeWorker(BaseWorker):
         stopped while waiting.
         """
         retries += 1
-        if retries >= MAX_RETRIES:
-            self.message_queue.put(
-                (PLATFORM, "[ระบบ]", f"❌ YouTube reconnect failed {MAX_RETRIES} ครั้ง — หยุดทำงาน")
-            )
-            return None
-
         backoff = min(INITIAL_BACKOFF * (2 ** (retries - 1)), MAX_BACKOFF)
         self.message_queue.put(
-            (PLATFORM, "[ระบบ]", f"🔄 YouTube chat หมดอายุ — reconnect ครั้งที่ {retries}/{MAX_RETRIES} (รอ {backoff}s)")
+            (PLATFORM, "[ระบบ]", f"🔄 YouTube chat หมดอายุ — reconnect ครั้งที่ {retries} (รอ {backoff}s)")
         )
         logger.warning("pytchat session expired, reconnecting (attempt %d)", retries)
 
@@ -157,7 +143,7 @@ class YouTubeWorker(BaseWorker):
             return None
 
         try:
-            chat = pytchat.create(video_id=self.video_id)
+            chat = pytchat.create(video_id=self.video_id, interruptable=False)
             self._chat = chat
             retries = 0  # reset on successful reconnect
             self.message_queue.put((PLATFORM, "[ระบบ]", "✅ YouTube reconnected"))

@@ -6,9 +6,8 @@ import webbrowser
 from pathlib import Path
 
 
-CLIENT_ID = "dezbvkl619rp5g83gyezee3itn3alg"
+CLIENT_ID = os.environ.get("TWITCH_CLIENT_ID", "dezbvkl619rp5g83gyezee3itn3alg")
 SCOPE = "chat:read"
-REDIRECT_URI = "http://localhost"
 TOKEN_FILE = Path(os.environ.get("APPDATA", ".")) / "pychat-youtubelive" / "twitch_token.json"
 
 
@@ -54,10 +53,14 @@ def get_oauth_token() -> str | None:
     if saved:
         return saved
 
+    # Use high port to avoid requiring admin privileges on port 80
+    port = int(os.environ.get("TWITCH_OAUTH_PORT", "18932"))
+    redirect_uri = f"http://localhost:{port}"
+
     auth_url = (
         f"https://id.twitch.tv/oauth2/authorize"
         f"?client_id={CLIENT_ID}"
-        f"&redirect_uri={REDIRECT_URI}"
+        f"&redirect_uri={redirect_uri}"
         f"&response_type=token"
         f"&scope={SCOPE}"
         f"&force_verify=true"
@@ -72,7 +75,7 @@ def get_oauth_token() -> str | None:
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            server.bind(("127.0.0.1", 80))
+            server.bind(("127.0.0.1", port))
             server.listen(1)
             server.settimeout(120)
             conn, _ = server.accept()

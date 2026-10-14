@@ -27,6 +27,7 @@ class ChatGUI(ctk.CTk):
 
         # Track workers per platform (at most one per platform)
         self._workers: dict[str, object] = {}
+        self._platform_ids: dict[str, str] = {}
         self._platform_status: dict[str, str] = {}
         self._reconnect_counts: dict[str, int] = {}
 
@@ -138,6 +139,18 @@ class ChatGUI(ctk.CTk):
         else:
             self._start_platform(platform)
 
+    def _create_worker(self, platform: str, identifier: str):
+        """Create and initialize a worker. Returns (worker, error_string_or_None)."""
+        try:
+            worker = get_worker(platform, identifier, self._message_queue)
+        except Exception as e:
+            return None, str(e)
+        if platform == "YT":
+            err = worker.create_chat()
+            if err:
+                return None, err
+        return worker, None
+
     def _start_platform(self, platform: str) -> None:
         entry = self._get_entry(platform)
         identifier = entry.get().strip()
@@ -158,21 +171,14 @@ class ChatGUI(ctk.CTk):
         else:
             return
 
-        try:
-            worker = get_worker(platform, identifier, self._message_queue)
-        except Exception as e:
-            self._set_status(f"❌ {platform}: {e}")
+        worker, err = self._create_worker(platform, identifier)
+        if err:
+            self._set_status(f"❌ {platform}: {err}")
             return
-
-        # Platform-specific post-creation steps
-        if platform == "YT":
-            err = worker.create_chat()
-            if err:
-                self._set_status(f"❌ YouTube: {err}")
-                return
 
         worker.start()
         self._workers[platform] = worker
+        self._platform_ids[platform] = identifier
 
         btn = self._get_btn(platform)
         btn.configure(text="Stop", fg_color="#c0392b", hover_color="#922b21")
@@ -183,6 +189,7 @@ class ChatGUI(ctk.CTk):
         if worker:
             worker.stop()
 
+        self._platform_ids.pop(platform, None)
         btn = self._get_btn(platform)
         btn.configure(text="Start", fg_color=("#2CC985", "#2FA572"), hover_color=("#0C955A", "#106A43"))
 
@@ -206,9 +213,19 @@ class ChatGUI(ctk.CTk):
 
         for platform in dead_platforms:
             self._workers.pop(platform, None)
-            btn = self._get_btn(platform)
-            btn.configure(text="Start", fg_color=("#2CC985", "#2FA572"), hover_color=("#0C955A", "#106A43"))
-            self._platform_status[platform] = "📴 disconnected"
+            identifier = self._platform_ids.get(platform)
+            if identifier:
+                worker, err = self._create_worker(platform, identifier)
+                if err:
+                    self._platform_status[platform] = f"❌ auto-restart failed: {err}"
+                else:
+                    worker.start()
+                    self._workers[platform] = worker
+                    self._platform_status[platform] = "🔄 auto-restarted"
+                    self._reconnect_counts[platform] = 0
+                    logger.info("Auto-restarted %s worker (id=%s)", platform, identifier)
+            else:
+                self._platform_status[platform] = "📴 disconnected"
 
         if dead_platforms:
             self._update_status()
